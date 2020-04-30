@@ -40,27 +40,30 @@ void IntegrationKernel(
         gx = (gx < 0.01) ? 0.01 : gx;
         gy = (gy < 0.01) ? 0.01 : gy;
 
+        // This is the core of the gradient descent step
+        // 1. computation of the gradient for each coordinate 
         ux = momentum * ux - eta * gx * dx;
         uy = momentum * uy - eta * gy * dy;
-
+        // 2. appying the gradient to the points 
         points[i] += ux;
         points[i + num_points] += uy;
 
-        attr_forces[i] = 0.0f;
-        attr_forces[num_points + i] = 0.0f;
-        rep_forces[i] = 0.0f;
-        rep_forces[num_points + i] = 0.0f;
-        old_forces[i] = ux;
-        old_forces[num_points + i] = uy;
-        gains[i] = gx;
-        gains[num_points + i] = gy;
+        attr_forces[i] = 0.0f; // Resetting variables 
+        attr_forces[num_points + i] = 0.0f; // Resetting variables 
+        rep_forces[i] = 0.0f; // Resetting variables 
+        rep_forces[num_points + i] = 0.0f; // Resetting variables 
+
+        old_forces[i] = ux; // gradient of previous step is used for momentum calculation
+        old_forces[num_points + i] = uy; // gradient of previous step is used for momentum calculation
+        gains[i] = gx; // gains are also updated 
+        gains[num_points + i] = gy; // gains are also updated 
    }
 }
 
 void tsnecuda::ApplyForces(tsnecuda::GpuOptions &gpu_opt,
-                                thrust::device_vector<float> &points,
-                                thrust::device_vector<float> &attr_forces,
-                                thrust::device_vector<float> &rep_forces,
+                                thrust::device_vector<float> &points, // (y_1x, y_1y, y_2x, y_2y, ...)
+                                thrust::device_vector<float> &attr_forces, // ((attr_1x, attr_1y), ..., (attr_ix, attr_iy))
+                                thrust::device_vector<float> &rep_forces, // ((rep_1x, rep_1y), ..., (rep_ix, rep_iy))
                                 thrust::device_vector<float> &gains,
                                 thrust::device_vector<float> &old_forces,
                                 const float eta,

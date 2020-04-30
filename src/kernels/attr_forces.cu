@@ -21,16 +21,19 @@ void ComputePijxQijKernel(
     register float ix, iy, jx, jy, dx, dy, pijqij;
     TID = threadIdx.x + blockIdx.x * blockDim.x;
     if (TID >= num_nonzero) return;
+
+    // Seems like the coo indices store the endpoints of each edge corresponding to a P
+    // in an adjacent fashion so we have something like: [1|2;2|3;i|j; ...]
     i = coo_indices[2*TID];
     j = coo_indices[2*TID+1];
 
-    ix = points[i]; iy = points[num_points + i];
-    jx = points[j]; jy = points[num_points + j];
+    ix = points[i]; iy = points[num_points + i]; // gets the x and y coordinates of point i
+    jx = points[j]; jy = points[num_points + j]; // gets the x and y coordinates of point j
     dx = ix - jx;
     dy = iy - jy;
-    pijqij = pij[TID] / (1 + dx*dx + dy*dy);
-    atomicAdd(attr_forces + i, pijqij * dx);
-    atomicAdd(attr_forces + num_points + i, pijqij * dy);
+    pijqij = pij[TID] / (1 + dx*dx + dy*dy); // computes the pq mult by acknowledging that q=v/Z
+    atomicAdd(attr_forces + i, pijqij * dx); // Adds x component of the point
+    atomicAdd(attr_forces + num_points + i, pijqij * dy); // Adds y component of the point
 }
 
 void tsnecuda::ComputeAttractiveForces(

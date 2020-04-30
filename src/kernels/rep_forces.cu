@@ -16,26 +16,30 @@ __global__ void compute_repulsive_forces_kernel(
 
     register float phi1, phi2, phi3, phi4, x_pt, y_pt;
 
-    phi1 = potentialsQij[TID * n_terms + 0];
-    phi2 = potentialsQij[TID * n_terms + 1];
-    phi3 = potentialsQij[TID * n_terms + 2];
-    phi4 = potentialsQij[TID * n_terms + 3];
+    // This are the terms that were computed below
+    phi1 = potentialsQij[TID * n_terms + 0]; // 1
+    phi2 = potentialsQij[TID * n_terms + 1]; // x_pt
+    phi3 = potentialsQij[TID * n_terms + 2]; // y_pt
+    phi4 = potentialsQij[TID * n_terms + 3]; // x_pt * x_pt + y_pt * y_pt;
 
     x_pt = xs[TID];
     y_pt = ys[TID];
 
+    // This is the Z term = \sum_{kl} (1+||y_i-y_j||^2)^{-1}
+    // (y_ix-yjx)^2 + (y_iy-yjy)^2  = y_ix^2 - 2 y_ix y_jx + y_jx^2 + y_iy^2 - 2 y_iy y_jy + y_jy^2
+    // below we have a simplification of this without the ^{-1}
     normalization_vec_device[TID] =
         (1 + x_pt * x_pt + y_pt * y_pt) * phi1 - 2 * (x_pt * phi2 + y_pt * phi3) + phi4;
 
-    repulsive_forces_device[TID] = x_pt * phi1 - phi2;
-    repulsive_forces_device[TID + num_points] = y_pt * phi1 - phi3;
+    repulsive_forces_device[TID] = x_pt * phi1 - phi2; // (y_ix - y_jx)
+    repulsive_forces_device[TID + num_points] = y_pt * phi1 - phi3; // (y_iy - y_jy)
 }
 
 float tsnecuda::ComputeRepulsiveForces(
     thrust::device_vector<float> &repulsive_forces_device,
     thrust::device_vector<float> &normalization_vec_device,
     thrust::device_vector<float> &points_device,
-    thrust::device_vector<float> &potentialsQij,
+    thrust::device_vector<float> &potentialsQij, // is this the 4*
     const int num_points,
     const int n_terms)
 {
@@ -44,8 +48,8 @@ float tsnecuda::ComputeRepulsiveForces(
     compute_repulsive_forces_kernel<<<num_blocks, num_threads>>>(
         thrust::raw_pointer_cast(repulsive_forces_device.data()),
         thrust::raw_pointer_cast(normalization_vec_device.data()),
-        thrust::raw_pointer_cast(points_device.data()),
-        thrust::raw_pointer_cast(points_device.data() + num_points),
+        thrust::raw_pointer_cast(points_device.data()), // passes all x coordinates
+        thrust::raw_pointer_cast(points_device.data() + num_points), // passes all y coordinates
         thrust::raw_pointer_cast(potentialsQij.data()),
         num_points, n_terms);
     float sumQ = thrust::reduce(
@@ -66,8 +70,12 @@ __global__ void compute_chargesQij_kernel(
         return;
 
     register float x_pt, y_pt;
-    x_pt = xs[TID];
-    y_pt = ys[TID];
+    x_pt = xs[TID]; // gets x coordinate of the point
+    y_pt = ys[TID]; // gets y coordinate of the point
+
+    // p = (1+||y_i-y_j||^2)^{-1}/Z
+    // seems like this kernel just precomputes everything so it 
+    // can be used in both attr and rep terms 
 
     chargesQij[TID * n_terms + 0] = 1;
     chargesQij[TID * n_terms + 1] = x_pt;
@@ -89,3 +97,5 @@ void tsnecuda::ComputeChargesQij(
         thrust::raw_pointer_cast(points_device.data() + num_points),
         num_points, n_terms);
 }
+
+

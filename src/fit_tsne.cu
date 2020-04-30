@@ -39,6 +39,7 @@ void tsnecuda::RunTsne(tsnecuda::Options &opt,
     START_IL_TIMER();
 
     if (opt.verbosity > 0) {
+        std::cout << "This is a modified version by Nicola Chaves-de-Plaza" << std::flush;
         std::cout << "Initializing cuda handles... " << std::flush;
     }
 
